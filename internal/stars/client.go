@@ -114,7 +114,7 @@ func (c *Client) All(ctx context.Context, out io.Writer) error {
 				Repositories connection[repository] `json:"starredRepositories"`
 			} `json:"viewer"`
 		}
-		err := c.api.DoWithContext(ctx, allQuery, map[string]interface{}{"cursor": cursor}, &result)
+		err := c.api.DoWithContext(ctx, allQuery, map[string]any{"cursor": cursor}, &result)
 		return result.Viewer.Repositories, err
 	}, printRepository(out))
 }
@@ -126,7 +126,7 @@ func (c *Client) eachList(ctx context.Context, visit func(userList) error) error
 				Lists connection[userList] `json:"lists"`
 			} `json:"viewer"`
 		}
-		err := c.api.DoWithContext(ctx, listsQuery, map[string]interface{}{"cursor": cursor}, &result)
+		err := c.api.DoWithContext(ctx, listsQuery, map[string]any{"cursor": cursor}, &result)
 		return result.Viewer.Lists, err
 	}, visit)
 }
@@ -161,7 +161,7 @@ func (c *Client) List(ctx context.Context, name string, out io.Writer) error {
 				Items connection[repository] `json:"items"`
 			} `json:"node"`
 		}
-		err := c.api.DoWithContext(ctx, itemsQuery, map[string]interface{}{"id": id, "cursor": cursor}, &result)
+		err := c.api.DoWithContext(ctx, itemsQuery, map[string]any{"id": id, "cursor": cursor}, &result)
 		if err != nil {
 			return connection[repository]{}, err
 		}
