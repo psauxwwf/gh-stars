@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv: ["build.env"]
+
+vars:
+  GOBIN: go
+  LDFLAGS: "-extldflags '-static' -w -s -buildid="
+  GCFLAGS: "all=-dwarf=false -l"
+  BIN: "{{.ROOT_DIR}}/bin"
+  APP: gh-stars
+  APP_BIN: "{{.ROOT_DIR}}/{{.APP}}"
+  REPO: psauxwwf/gh-stars
+  RELEASE_BINARY: "{{.BIN}}/{{.APP}}_linux-amd64"
+  RELEASE_LINUX_ARCHIVE: "{{.BIN}}/{{.APP}}_linux_amd64.tar.gz"
+  TAG: '{{now | date "v01.02.15"}}'
+
+env:
+  CGO_ENABLED: "0"
+  GOARCH: amd64
+  GOOS: linux
+
+tasks:
+  setup:
+    desc: Set up the build directory
+    internal: true
+    silent: true
+    cmds:
+      - mkdir -p "{{.BIN}}"
+
+  check:
+    desc: Run Go static analysis
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - "{{.GOBIN}} vet ./..."
+      - "{{.GOBIN}} fmt ./..."
+      - "{{.GOBIN}} fix ./..."
+
+  build:
+    desc: Build the static Linux amd64 binary
+    dir: "{{.ROOT_DIR}}"
+    deps: [setup]
+    cmds:
+      - >
+        {{.GOBIN}} build
+        -tags netgo
+        -ldflags="{{.LDFLAGS}}"
+        -trimpath
+        -gcflags="{{.GCFLAGS}}"
+        -o "{{.APP_BIN}}"
+        ./cmd/{{.APP}}
+      - strip "{{.APP_BIN}}"
+      - objcopy --strip-unneeded "{{.APP_BIN}}"
+
+  package:
+    desc: Build the release binary and tar.gz archive
+    dir: "{{.ROOT_DIR}}"
+    deps: [build]
+    cmds:
+      # gh extension install needs an uncompressed asset ending in linux-amd64.
+      - cp "{{.APP_BIN}}" "{{.RELEASE_BINARY}}"
+      - tar -czf "{{.RELEASE_LINUX_ARCHIVE}}" -C "{{.ROOT_DIR}}" "{{.APP}}"
+
+  release:
+    desc: Build and publish a GitHub release
+    dir: "{{.ROOT_DIR}}"
+    preconditions:
+      - sh: test -z "$(git status --porcelain)"
+        msg: Commit and push your changes before publishing a release.
+    cmds:
+      - task: check
+      - task: package
+      - >
+        gh release create "{{.TAG}}"
+        "{{.RELEASE_BINARY}}" "{{.RELEASE_LINUX_ARCHIVE}}"
+        --repo "{{.REPO}}"
+        --target "$(git rev-parse HEAD)"
+        --generate-notes
